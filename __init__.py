@@ -1,1 +1,1 @@
-from PySussix import *
+from .PySussix import *

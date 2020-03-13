@@ -23,7 +23,7 @@
 #
 
 
-import pysussix
+from . import pysussix
 
 
 class Sussix():
