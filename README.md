@@ -16,6 +16,11 @@ In a `conda` environment, this can be done with:
 conda install -c conda-forge numpy gcc gfortran
 ```
 
+or, more reliably (espectially on MAC machines):
+```bash
+conda install -c conda-forge compilers
+```
+
 Then, run the `install` installation script:
 ```bash
 bash install
