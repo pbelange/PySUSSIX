@@ -21,18 +21,20 @@ bash ./Executables/Miniforge3-latest.sh -b  -p ./Executables/miniforge3 -f
 source ./Executables/miniforge3/bin/activate
 
 conda update -n base -c conda-forge conda
-conda create -n py-sussix #python=3.8
-# conda activate py-sussix
+conda create -n py-sussix python=3.10
+conda activate py-sussix
 
 
 # conda install -c conda-forge numpy gfortran
 conda install -c conda-forge compilers
+
 
 # Install generic python packages
 #========================================
 pip install jupyterlab
 pip install ipywidgets
 pip install pandas
+# pip install ipython
 pip install numpy
 pip install matplotlib
 pip install scipy
@@ -42,6 +44,7 @@ pip install rich
 pip install lfm
 pip install pynaff
 pip install NAFFlib
+pip install pyarrow
 
 # Adding the jupyter kernel to the list of kernels
 python -m ipykernel install --user --name py-sussix --display-name "py-sussix"

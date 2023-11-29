@@ -12,5 +12,5 @@ Executables/**
 *.pyo
 *.pyd
 *.egg-info/
-
-
+*cpython*
+*.inp
