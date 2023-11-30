@@ -2,7 +2,7 @@ import numpy as np
 import pandas as pd
 
 import PySUSSIX.f90sussix.f90sussix as f90sussix
-import PySUSSIX.crossref as crossref
+import PySUSSIX.crosssussix.crossref as crossref
 
 
 
