@@ -23,10 +23,10 @@
 #
 
 
-from . import pysussix
+from . import f90sussix
 
 
-class Sussix():
+class F90Sussix():
     '''
         @class: Sussix
         Class to manage sussix calls
@@ -81,7 +81,7 @@ class Sussix():
 
 
     def sussix(self, x, xp, y, yp, z, zp):
-        z = pysussix.sussixnoo(x, xp, y, yp, z, zp, len(x))
+        z = f90sussix.sussixnoo(x, xp, y, yp, z, zp, len(x))
         self.tunex = z[0]
         self.tuney = z[1]
         self.tunez = z[2]

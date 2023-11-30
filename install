@@ -2,7 +2,7 @@
 
 cd src
 make
-mv pysussix*.so ../PySussix/
+mv f90sussix*.so ../PySussix/f90sussix/
 cd ..
 
 
