@@ -7,7 +7,7 @@ Executables/**
 *.DS_Store
 *.html
 *.pkl
-*.parquet
+# *.parquet
 *.pyc
 *.pyo
 *.pyd
