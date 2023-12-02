@@ -1017,6 +1017,12 @@ Cf2py depend(n_points) x, xp, y, yp, s, sp
       common/fcoe/zxpes(mterm),zypes(mterm),zspes(mterm)
       dimension tx(mterm),ty(mterm),tz(mterm),etune(3)
 
+      ! insertion P.Belanger
+      !--------------------
+      double precision j_vec,k_vec,l_vec,m_vec,order_vec
+      common/jklm/j_vec(mterm),k_vec(mterm),l_vec(mterm),m_vec(mterm)
+      common/jklm/order_vec(mterm)
+      !--------------------
 
       double precision amplitude(14), phase(14), ox(600), ax(600),
      & oy(600), ay(600), os(600), as(600)
@@ -1032,13 +1038,13 @@ Cf2py depend(n_points) x, xp, y, yp, s, sp
       iscay=0
       iscaz=0
  
-      if(nr.gt.10) then
-!         write(6,*)'ERROR IN ORDRES: NR LARGER THAN 10'
-!         close(10)
-        close(30)
-!         close(iunit)
-        stop
-      endif
+!       if(nr.gt.10) then
+! !         write(6,*)'ERROR IN ORDRES: NR LARGER THAN 10'
+! !         close(10)
+!         close(30)
+! !         close(iunit)
+!         stop
+!       endif
  
       do j=1,narm
         tx(j)=txa(j)
@@ -1263,6 +1269,15 @@ Cf2py depend(n_points) x, xp, y, yp, s, sp
                     j1=j
                     epsx=ex
                     ordcx=ordc
+
+                    ! insertion P.Belanger
+                    !--------------------
+                    j_vec(n)=l
+                    k_vec(n)=m
+                    l_vec(n)=k
+                    m_vec(n)=j
+                    order_vec(n)=ordc
+                    !--------------------
                   endif
                 endif
               enddo

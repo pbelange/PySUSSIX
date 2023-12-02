@@ -37,6 +37,15 @@ fort2py = {
     'phase': 'phase_values',
 
     # Other Variables
+    'tunex': 'tunex',
+    'tuney': 'tuney',
+    'tunez': 'tunez',
+    'ox'   : 'ox',
+    'ax'   : 'ax',
+    'oy'   : 'oy',
+    'ay'   : 'ay',
+    'os'   : 'os',
+    'as'   : 'as',
     'n': 'data_point_index',
     'narm': 'number_of_harmonics',
     'nf': 'number_of_frequencies',
