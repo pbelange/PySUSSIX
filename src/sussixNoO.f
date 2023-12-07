@@ -650,10 +650,16 @@ Cf2py depend(n_points) x, xp, y, yp, s, sp
       parameter(mbpm=1000,pieni=1d-17,zero=0d0,one=1d0,two=2d0)
       dimension x(maxiter),xp(maxiter),zsing(maxiter)
       dimension z(maxiter)
+      ! insertion P.Belanger
+      !--------------------
+      double complex zw_out
+      common/data/zw_out(1)
+
  
 ! INITIALIZATION
       duepi=atan(1d0)*8d0
       tune=0d0
+      
  
 !.............................................................
 !    ESTIMATION OF TUNE WITH FFT
@@ -666,7 +672,10 @@ Cf2py depend(n_points) x, xp, y, yp, s, sp
         z(mf)=dcmplx(x(mf),xp(mf))*(1d0+cos(step*(mf-maxn2)))
         zsing(mf)=z(mf)
       enddo
+      write(6,*)'zsing',zsing(1)
+      write(6,*)'mft',mft
       call cfft(zsing,-mft)
+      write(6,*)'zsing post',zsing(1)
 !.............................................................
 !   SEARCH FOR MAXIMUM OF FOURIER SPECTRUM
 !.............................................................
@@ -678,13 +687,20 @@ Cf2py depend(n_points) x, xp, y, yp, s, sp
           nftmax=nft
         end if
       enddo
+      write(6,*)'zsing max',ftmax
       tunefou=dble(nftmax-1)/dble(npoint)
       if(tunefou.ge.0.5d0) tunefou=-(1d0-tunefou)
       deltat=1d0/npoint
       tune1=tunefou-deltat
+      write(6,*)'zfunr_input tune',tune
+      write(6,*)'zfunr_input zw',zw
+      write(6,*)'zfunr_input tune1',tune1
+      write(6,*)'zfunr_input z[0]',z(1)
+      write(6,*)'zfunr_input deltat',deltat
       call zfunr(tune,zw,z,maxn,tune1,deltat)
       tunenewt=tune
- 
+    !   write(6,*)'test zw',zw
+      zw_out(1) = zw
 !............................................................
       return
 !............................................................
@@ -739,6 +755,7 @@ Cf2py depend(n_points) x, xp, y, yp, s, sp
           nftmax=nft
         end if
       enddo
+
       tunefou=dble(nftmax-1)/dble(npoint)
       if(tunefou.ge.0.5d0) tunefou=-(1d0-tunefou)
       deltat=1d0/npoint
@@ -753,6 +770,31 @@ Cf2py depend(n_points) x, xp, y, yp, s, sp
 ! AUXILIARY ROUTINE USED BY TUNENEWT.
 !
 ! AUTHOR:     A. BAZZANI - BOLOGNA UNIVERSITY
+
+! P. Belanger + chatGPT comments:        
+! Initialization:
+!     tunea1: Initial estimate of the tune.
+!     deltat: Step size for tuning parameter updates.
+!     zu: Complex unit.
+
+! Iteration Loop (do ntest=1, 10):
+!     tunea2: Update the tune estimate.
+!     ztune2: Exponential term based on the updated tune.
+!     calcr(ztune2, zf, z, maxn): Evaluate the function z(tune) with the updated tune.
+!     calcr(ztune2, zfd, zd, maxn): Evaluate the derivative of z(tune) with respect to the tune.
+!     dtunea2: Calculate the product of the function value and its derivative.
+!     Check if the signs of dtunea1 and dtunea2 are suitable for the Newton method.
+
+! Newton-like Iterative Loop (do ncont=1,100):
+!     Update the tune estimate (tune3) based on the Newton method formula.
+!     Evaluate the function (z(tune3)) and its derivative (z'(tune3)).
+!     Adjust the tune estimates (tune1 and tune2) based on the comparison of signs.
+!     Check for convergence (abs(tune2-tune1)) and exit the loop if satisfied.
+
+! Result Recording:
+!    ! Record the tuned estimates in the tunetest array.
+!    ! The iterations involve updating the tune estimate based on the Newton method and checking 
+!    !  for convergence. This process is part of the overall goal of refining the tune estimate in the zfunr subroutine.
 !
 !=======================================================================
       implicit none
@@ -767,7 +809,14 @@ Cf2py depend(n_points) x, xp, y, yp, s, sp
       double precision pieni,zero,one,two,pi,duepi,piph
       parameter(mbpm=1000,pieni=1d-17,zero=0d0,one=1d0,two=2d0)
       dimension z(maxiter),zd(maxiter),tunetest(10),tuneval(10)
- 
+    
+      ! insertion P.Belanger
+      !--------------------
+      double precision tune_out
+      double complex zw_out
+      common/zfunr_out/tune_out(1),zw_out(1)
+
+
 ! INITIALIZATION
       duepi=atan(1d0)*8d0
       err=1d-10
@@ -787,8 +836,10 @@ Cf2py depend(n_points) x, xp, y, yp, s, sp
       enddo
 !............................................................
       ztune1=exp(-zu*duepi*tunea1)
+
       call calcr(ztune1,zf,z,maxn)
       call calcr(ztune1,zfd,zd,maxn)
+
       dtunea1=dble(zf)*dble(zfd)+dimag(zf)*dimag(zfd)
       num=1
       do ntest=1, 10
@@ -842,6 +893,8 @@ Cf2py depend(n_points) x, xp, y, yp, s, sp
       enddo
       ztune=exp(-zu*duepi*tune)
       call calcr(ztune,zw,z,maxn)
+      tune_out = tune
+      zw_out   = zw
 !............................................................
       return
 !............................................................
@@ -857,11 +910,19 @@ Cf2py depend(n_points) x, xp, y, yp, s, sp
       integer maxd,np
       double complex zp,zpp,zv
       dimension zp(*)
+
+      ! insertion P.Belanger
+      !--------------------
+      double complex zpp_out
+      common/calcr_out/zpp_out(1)
+      
       zpp=zp(maxd)
 !............................................................
       do np=maxd-1,1, -1
         zpp=zpp*zv+zp(np)
       enddo
+
+      zpp_out = zpp
 !............................................................
       return
 !............................................................
@@ -1019,9 +1080,15 @@ Cf2py depend(n_points) x, xp, y, yp, s, sp
 
       ! insertion P.Belanger
       !--------------------
-      double precision j_vec,k_vec,l_vec,m_vec,order_vec
-      common/jklm/j_vec(mterm),k_vec(mterm),l_vec(mterm),m_vec(mterm)
-      common/jklm/order_vec(mterm)
+      double precision jx_vec,kx_vec,lx_vec,mx_vec
+      common/x_jklm/jx_vec(mterm),kx_vec(mterm),                        &
+     &lx_vec(mterm),mx_vec(mterm)
+      double precision jy_vec,ky_vec,ly_vec,my_vec
+      common/y_jklm/jy_vec(mterm),ky_vec(mterm),                        &
+     &ly_vec(mterm),my_vec(mterm)
+      double precision js_vec,ks_vec,ls_vec,ms_vec
+      common/s_jklm/js_vec(mterm),ks_vec(mterm),                        &
+     &ls_vec(mterm),ms_vec(mterm)
       !--------------------
 
       double precision amplitude(14), phase(14), ox(600), ax(600),
@@ -1272,11 +1339,10 @@ Cf2py depend(n_points) x, xp, y, yp, s, sp
 
                     ! insertion P.Belanger
                     !--------------------
-                    j_vec(n)=l
-                    k_vec(n)=m
-                    l_vec(n)=k
-                    m_vec(n)=j
-                    order_vec(n)=ordc
+                    jx_vec(n)=l
+                    kx_vec(n)=m
+                    lx_vec(n)=k
+                    mx_vec(n)=j
                     !--------------------
                   endif
                 endif
@@ -1454,6 +1520,14 @@ c...  END INSERTION ROGELIO
                     j1=j
                     epsy=ey
                     ordcy=ordc
+
+                    ! insertion P.Belanger
+                    !--------------------
+                    jy_vec(n)=l
+                    ky_vec(n)=m
+                    ly_vec(n)=k
+                    my_vec(n)=j
+                    !--------------------
                   endif
                 endif
               enddo
@@ -1606,6 +1680,14 @@ c...  END INSERTION ROGELIO
                     j1=j
                     epsz=ez
                     ordcz=ordc
+
+                    ! insertion P.Belanger
+                    !--------------------
+                    js_vec(n)=l
+                    ks_vec(n)=m
+                    ls_vec(n)=k
+                    ms_vec(n)=j
+                    !--------------------
                   endif
                 endif
               enddo
@@ -3758,6 +3840,11 @@ c        write(6,*)nturn,-txa(1),-tya(1),-tsa(1)
       integer maxiter
       parameter(maxiter=100000)
       dimension a(maxiter)
+      ! insertion P.Belanger
+      !--------------------
+      double complex A_out
+      common/cfft_out/A_out(maxiter)
+
  
       IF(MSIGN.EQ.0) RETURN
       M=IABS(MSIGN)
@@ -3810,5 +3897,8 @@ c        write(6,*)nturn,-txa(1),-tya(1),-tsa(1)
           U=U*W
         enddo
       enddo
+      write(6,*)'A1',A(1)
+      write(6,*)'A2',A(2)
+      A_out = A
       RETURN
       END

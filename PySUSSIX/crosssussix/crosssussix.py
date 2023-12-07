@@ -15,7 +15,7 @@ def datspe(x,px,y,py,zeta,pzeta,number_of_harmonics = 5,method = 'hanning',retur
     """
     kwargs = {  'fortran_unit_number'       : 90,
                 'dimension_of_phase_space'  : 3,
-                'flag_for_real_signal'      : 1,
+                'flag_for_real_signal'      : 2,
                 'initial_turn_number'       : 1,
                 'final_turn_number'         : len(x),
                 'number_of_turns'           : len(x),
@@ -38,12 +38,14 @@ def datspe(x,px,y,py,zeta,pzeta,number_of_harmonics = 5,method = 'hanning',retur
 
     # The values are stored in the COMMONS (fortran database)
     if return_values:
-        return pd.DataFrame({   'zxpes':f90sussix.fcoe.zxpes[:number_of_harmonics],
-                                'txa'  :f90sussix.tune.txa[:number_of_harmonics],
-                                'zypes':f90sussix.fcoe.zxpes[:number_of_harmonics],
-                                'tya'  :f90sussix.tune.tya[:number_of_harmonics],
-                                'zspes':f90sussix.fcoe.zxpes[:number_of_harmonics],
-                                'tsa'  :f90sussix.tune.tya[:number_of_harmonics]})
+        x_spectrum = pd.DataFrame({ 'zxpes':f90sussix.fcoe.zxpes[:number_of_harmonics],
+                                    'txa'  :f90sussix.tune.txa[:number_of_harmonics]})
+        y_spectrum = pd.DataFrame({ 'zypes':f90sussix.fcoe.zypes[:number_of_harmonics],
+                                    'tya'  :f90sussix.tune.tya[:number_of_harmonics]})
+        s_spectrum = pd.DataFrame({ 'zspes':f90sussix.fcoe.zspes[:number_of_harmonics],
+                                    'tsa'  :f90sussix.tune.tsa[:number_of_harmonics]})
+        
+        return x_spectrum,y_spectrum, s_spectrum
                         
 
 
@@ -86,18 +88,33 @@ def ordres(nturns,tune_estimate = [0.31,0.32,0.0018],number_of_harmonics = 5,ret
     # The values are stored in ox,ax,amplitude,phase vectors
     # Returning frequencies with jlkm indices where Q_eff = j*Q_x + k*Q_y + l*Q_z + m
     if return_values:
-        return pd.DataFrame({   'order'     :f90sussix.jklm.order_vec[:number_of_harmonics].astype(int),
-                                'j'         :f90sussix.jklm.j_vec[:number_of_harmonics].astype(int),
-                                'k'         :f90sussix.jklm.k_vec[:number_of_harmonics].astype(int),
-                                'l'         :f90sussix.jklm.l_vec[:number_of_harmonics].astype(int),
-                                'm'         :f90sussix.jklm.m_vec[:number_of_harmonics].astype(int),
-                                'ax'        :kwargs['ax'][:number_of_harmonics],
-                                'fx'        :np.angle(f90sussix.fcoe.zxpes[:number_of_harmonics]),
-                                'ox'        :kwargs['ox'][:number_of_harmonics],
-                                'ay'        :kwargs['ay'][:number_of_harmonics],
-                                'fy'        :np.angle(f90sussix.fcoe.zypes[:number_of_harmonics]),
-                                'oy'        :kwargs['oy'][:number_of_harmonics],
-                                'as'        :kwargs['as'][:number_of_harmonics],
-                                'fs'        :np.angle(f90sussix.fcoe.zspes[:number_of_harmonics]),
-                                'os'        :kwargs['os'][:number_of_harmonics]})
+
+        x_spectrum = pd.DataFrame({ 'j'         :f90sussix.x_jklm.jx_vec[:number_of_harmonics].astype(int),
+                                    'k'         :f90sussix.x_jklm.kx_vec[:number_of_harmonics].astype(int),
+                                    'l'         :f90sussix.x_jklm.lx_vec[:number_of_harmonics].astype(int),
+                                    'm'         :f90sussix.x_jklm.mx_vec[:number_of_harmonics].astype(int),
+                                    'ax'        :kwargs['ax'][:number_of_harmonics],
+                                    'fx'        :np.angle(f90sussix.fcoe.zxpes[:number_of_harmonics]),
+                                    'ox'        :kwargs['ox'][:number_of_harmonics]})
+
+        # same for y_spectrum
+        y_spectrum = pd.DataFrame({ 'j'         :f90sussix.y_jklm.jy_vec[:number_of_harmonics].astype(int),
+                                    'k'         :f90sussix.y_jklm.ky_vec[:number_of_harmonics].astype(int),
+                                    'l'         :f90sussix.y_jklm.ly_vec[:number_of_harmonics].astype(int),
+                                    'm'         :f90sussix.y_jklm.my_vec[:number_of_harmonics].astype(int),
+                                    'ay'        :kwargs['ay'][:number_of_harmonics],
+                                    'fy'        :np.angle(f90sussix.fcoe.zypes[:number_of_harmonics]),
+                                    'oy'        :kwargs['oy'][:number_of_harmonics]})
+        
+        # same for s_spectrum
+        s_spectrum = pd.DataFrame({ 'j'         :f90sussix.s_jklm.js_vec[:number_of_harmonics].astype(int),
+                                    'k'         :f90sussix.s_jklm.ks_vec[:number_of_harmonics].astype(int),
+                                    'l'         :f90sussix.s_jklm.ls_vec[:number_of_harmonics].astype(int),
+                                    'm'         :f90sussix.s_jklm.ms_vec[:number_of_harmonics].astype(int),
+                                    'as'        :kwargs['as'][:number_of_harmonics],
+                                    'fs'        :np.angle(f90sussix.fcoe.zspes[:number_of_harmonics]),
+                                    'os'        :kwargs['os'][:number_of_harmonics]})
+
+
+        return x_spectrum,y_spectrum,s_spectrum
         
