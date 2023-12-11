@@ -97,6 +97,9 @@ def zfunr(z,tune0):
     deltat = 1.0 / maxn
     _z[:maxn] = z
 
+    npoint = 2**int(np.log2(maxn))
+    deltat = 1.0 /npoint
+
     
     # Run fortran code
     f90sussix.zfunr(tune,zw,_z,maxn,tunea1,deltat)

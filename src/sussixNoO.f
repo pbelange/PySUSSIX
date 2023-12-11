@@ -672,10 +672,10 @@ Cf2py depend(n_points) x, xp, y, yp, s, sp
         z(mf)=dcmplx(x(mf),xp(mf))*(1d0+cos(step*(mf-maxn2)))
         zsing(mf)=z(mf)
       enddo
-      write(6,*)'zsing',zsing(1)
-      write(6,*)'mft',mft
+    !   write(6,*)'zsing',zsing(1)
+    !   write(6,*)'mft',mft
       call cfft(zsing,-mft)
-      write(6,*)'zsing post',zsing(1)
+    !   write(6,*)'zsing post',zsing(1)
 !.............................................................
 !   SEARCH FOR MAXIMUM OF FOURIER SPECTRUM
 !.............................................................
@@ -687,16 +687,16 @@ Cf2py depend(n_points) x, xp, y, yp, s, sp
           nftmax=nft
         end if
       enddo
-      write(6,*)'zsing max',ftmax
+    !   write(6,*)'zsing max',ftmax
       tunefou=dble(nftmax-1)/dble(npoint)
       if(tunefou.ge.0.5d0) tunefou=-(1d0-tunefou)
       deltat=1d0/npoint
       tune1=tunefou-deltat
-      write(6,*)'zfunr_input tune',tune
-      write(6,*)'zfunr_input zw',zw
-      write(6,*)'zfunr_input tune1',tune1
-      write(6,*)'zfunr_input z[0]',z(1)
-      write(6,*)'zfunr_input deltat',deltat
+    !   write(6,*)'zfunr_input tune',tune
+    !   write(6,*)'zfunr_input zw',zw
+    !   write(6,*)'zfunr_input tune1',tune1
+    !   write(6,*)'zfunr_input z[0]',z(1)
+    !   write(6,*)'zfunr_input deltat',deltat
       call zfunr(tune,zw,z,maxn,tune1,deltat)
       tunenewt=tune
     !   write(6,*)'test zw',zw
@@ -817,6 +817,7 @@ Cf2py depend(n_points) x, xp, y, yp, s, sp
       common/zfunr_out/tune_out(1),zw_out(1)
 
 
+      
 ! INITIALIZATION
       duepi=atan(1d0)*8d0
       err=1d-10
@@ -840,8 +841,12 @@ Cf2py depend(n_points) x, xp, y, yp, s, sp
       call calcr(ztune1,zf,z,maxn)
       call calcr(ztune1,zfd,zd,maxn)
 
+    !   write(6,*)'DFFT:',zf,zfd
+
       dtunea1=dble(zf)*dble(zfd)+dimag(zf)*dimag(zfd)
       num=1
+
+    !   write(6,*)'BEFORE ALL:',tunea1, tunea2, dtunea1, dtunea2
       do ntest=1, 10
         tunea2=tunea1+deltat
         ztune2=exp(-zu*duepi*tunea2)
@@ -853,6 +858,7 @@ Cf2py depend(n_points) x, xp, y, yp, s, sp
           tune2=tunea2
           dtune1=dtunea1
           dtune2=dtunea2
+          
           do ncont=1,100
 !            ratio=-dtune1/dtune2
             if(abs(dtune2).gt.0) then
@@ -876,9 +882,11 @@ Cf2py depend(n_points) x, xp, y, yp, s, sp
             endif
             if (abs(tune2-tune1).le.err) goto 100
           enddo
+          
  100      tunetest(num)=tune3
           tuneval(num)=cdabs(zf)
           num=num+1
+        !   write(6,*)'test:',tunetest
         endif
         tunea1=tunea2
         dtunea1=dtunea2
@@ -3897,8 +3905,6 @@ c        write(6,*)nturn,-txa(1),-tya(1),-tsa(1)
           U=U*W
         enddo
       enddo
-      write(6,*)'A1',A(1)
-      write(6,*)'A2',A(2)
       A_out = A
       RETURN
       END
