@@ -23,7 +23,10 @@ def Hann(N,Nt = None,p=1):
     """
     if Nt is None:
         Nt = np.max(N)
-    center = Nt//2 - 1 
+    if np.mod(Nt,2) == 0:
+        center = Nt//2 - 1
+    else:
+        center = Nt//2
     return (2**p)*math.factorial(p)**2/(math.factorial(2*p)) * (1+np.cos(2*np.pi*(N-center)/Nt))**(p)
 
 
@@ -31,6 +34,7 @@ def Laskar_DFFT(freq,N,z):
     """
     Discrete fourier transform of z, as defined in A. Wolski, Sec. 11.5.
     In a typical DFFT , freq = m/Nt where m is an integer. Here m could take any value.
+    Note: this will differ from sussix.f.calcr by a factor 1/Nt (but improves the convergence of the Newton method)
     ----------------------------------------------------
         freq: discrete frequency to evaluate the DFFT at
         N   : turn numbers of the signal
@@ -43,6 +47,7 @@ def Laskar_DFFT(freq,N,z):
 def Laskar_DFFT_derivative(freq,N,z):
     """
     Derivative of laskar_DFFT w.r.t freq
+    Note: differs from exact derivative by a factor -2pi (but allows newton method to converge)
     """
     Nt = len(z)
     deriv_factor = 1j*N
@@ -71,7 +76,7 @@ def FFT_tune_estimate(z):
     return tune_est,resolution
 
 
-def fundamental_frequency(x,px,Hann_order = 1):
+def fundamental_frequency(x,px,Hann_order = 1,optimization = 'fortran'):
 
     # Windowing of the signal
     N   = np.arange(len(x))
@@ -87,10 +92,76 @@ def fundamental_frequency(x,px,Hann_order = 1):
     tune_est = tune_est - resolution
 
     # Refinement of the tune calulation
-    # tune,zw = crossroutines.zfunr(z_w,tune_est)
-    tune,amplitude = newton_method(z_w,N,tune_est,resolution)
+    if optimization == 'fortran':
+        tune,amplitude = crossroutines.zfunr(z_w,tune_est)
+        amplitude /= len(z_w)
+    else:
+        tune,amplitude = newton_method(z_w,N,tune_est,resolution)
 
     return tune,amplitude
+
+
+def NAFF(x,px,number_of_harmonics = 5,Hann_order = 1):
+    """
+    Applies the NAFF algorithm to find the spectral lines of a signal.
+    """
+
+    assert number_of_harmonics >=1, 'number_of_harmonics needs to be > 1'
+    
+    # Converting to numpy arrays
+    x,px = np.array(x),np.array(px)
+
+    # initialisation
+    z  = x + 1j*px
+    N  = np.arange(len(x))
+    
+    
+    frequencies = []
+    amplitudes  = [] 
+    for _ in range(number_of_harmonics):
+
+        # Computing frequency and amplitude
+        freq,amp  = fundamental_frequency(x,px,Hann_order=Hann_order)
+
+        # Saving results
+        frequencies.append(freq)
+        amplitudes.append(amp)
+
+        # Substraction procedure
+        zgs  = amp * np.exp(2 * np.pi * 1j * freq * N)
+        z   -= zgs
+        x,px = np.real(z), np.imag(z)
+
+    
+    return pd.DataFrame({'amplitude':amplitudes,'frequency':frequencies})
+
+
+
+def get_harmonics(x = None,px = None,y = None,py = None,zeta = None,pzeta = None,number_of_harmonics = 5,Hann_order = 1):
+    """
+    Computes the spectrum of a tracking data set for all canonical pairs provided
+    """
+
+    results = {}
+    for pair in [(x,px,'x'),(y,py,'y'),(zeta,pzeta,'zeta')]:
+        z,pz,plane = pair
+        
+        if z is not None:
+            if pz is None:
+                pz = np.zeros(len(z))
+
+            # Computing spectral lines
+            df = NAFF(z,pz, number_of_harmonics = number_of_harmonics,
+                                Hann_order      = Hann_order )
+            
+            results[plane] = df
+
+        else:
+            results[plane] = None
+
+
+    return results
+
 
 
 def newton_method(z,N,tune_est,resolution):
@@ -221,7 +292,7 @@ def tunenewt(x,px,hanning_order = 1):
     return tune,zw
 
 
-def spectrum(x,px,number_of_harmonics = 5,method = 'hanning'):
+def spectrum(x,px,number_of_harmonics = 5,Hann_order = 1):
     """
     COMPUTE THE MAIN FREQUENCY OF A CANONICAL PAIR 
     (WITHOUT ORTHOGONALIZATION OF GRAM-SCHMIDT)
@@ -243,7 +314,7 @@ def spectrum(x,px,number_of_harmonics = 5,method = 'hanning'):
         # # freq,zw = crossroutines.tunenewt(x,px)
         # zpesi   = zw / max(N+1)
 
-        freq,amp  = fundamental_frequency(x,px,Hann_order=1)
+        freq,amp  = fundamental_frequency(x,px,Hann_order=Hann_order)
 
         # Saving results
         frequencies.append(freq)
@@ -260,7 +331,7 @@ def spectrum(x,px,number_of_harmonics = 5,method = 'hanning'):
     
 
 
-def datspe(x = None,px = None,y = None,py = None,zeta = None,pzeta = None,number_of_harmonics = 5,method = 'hanning'):
+def datspe(x = None,px = None,y = None,py = None,zeta = None,pzeta = None,number_of_harmonics = 5,Hann_order = 1):
     """
     THIS PROGRAM CALCULATES THE SPECTRUM OF A TRACKING DATA SET,
     THE TUNE AND THE LINES ARE CALCULATED WITH THE ROUTINE SPECTRUM
@@ -281,7 +352,7 @@ def datspe(x = None,px = None,y = None,py = None,zeta = None,pzeta = None,number
             # df.rename(columns={'tune':'frequency','zpesi':'amplitude'},inplace=True)
             # df = df[['amplitude','frequency']]
             df = spectrum(z,pz, number_of_harmonics = number_of_harmonics,
-                                method              = method)
+                                Hann_order          = Hann_order )
             
             results[plane] = df
 
