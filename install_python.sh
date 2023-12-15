@@ -28,6 +28,11 @@ conda activate py-sussix
 # conda install -c conda-forge numpy gfortran
 conda install -c conda-forge compilers
 
+# makefile of newton.f
+cd PySUSSIX/ducksussix
+make
+cd ../..
+
 
 # Install generic python packages
 #========================================

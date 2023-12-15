@@ -6,8 +6,7 @@ import numpy as np
 import pandas as pd
 import math
 
-import PySUSSIX.crosssussix.crossroutines as crossroutines
-import PySUSSIX.crosssussix.crosssussix as crosssussix
+import PySUSSIX.ducksussix.f90newton as f90newton
 
 
 
@@ -34,7 +33,7 @@ def Laskar_DFFT(freq,N,z):
     """
     Discrete fourier transform of z, as defined in A. Wolski, Sec. 11.5.
     In a typical DFFT , freq = m/Nt where m is an integer. Here m could take any value.
-    Note: this will differ from sussix.f.calcr by a factor 1/Nt (but improves the convergence of the Newton method)
+    Note: this will differ from sussix.f.calcr by a factor 1/Nt (but does not slow the convergence of the Newton method, so not a problem)
     ----------------------------------------------------
         freq: discrete frequency to evaluate the DFFT at
         N   : turn numbers of the signal
@@ -93,15 +92,14 @@ def fundamental_frequency(x,px,Hann_order = 1,optimization = 'fortran'):
 
     # Refinement of the tune calulation
     if optimization == 'fortran':
-        tune,amplitude = crossroutines.zfunr(z_w,tune_est)
-        amplitude /= len(z_w)
+        tune,amplitude = f90newton_method(z_w,tune_est,resolution)
     else:
         tune,amplitude = newton_method(z_w,N,tune_est,resolution)
 
     return tune,amplitude
 
 
-def NAFF(x,px,number_of_harmonics = 5,Hann_order = 1):
+def NAFF(x,px,number_of_harmonics = 5,Hann_order = 1,optimization = 'fortran'):
     """
     Applies the NAFF algorithm to find the spectral lines of a signal.
     """
@@ -121,7 +119,7 @@ def NAFF(x,px,number_of_harmonics = 5,Hann_order = 1):
     for _ in range(number_of_harmonics):
 
         # Computing frequency and amplitude
-        freq,amp  = fundamental_frequency(x,px,Hann_order=Hann_order)
+        freq,amp  = fundamental_frequency(x,px,Hann_order=Hann_order,optimization=optimization)
 
         # Saving results
         frequencies.append(freq)
@@ -137,7 +135,7 @@ def NAFF(x,px,number_of_harmonics = 5,Hann_order = 1):
 
 
 
-def get_harmonics(x = None,px = None,y = None,py = None,zeta = None,pzeta = None,number_of_harmonics = 5,Hann_order = 1):
+def get_harmonics(x = None,px = None,y = None,py = None,zeta = None,pzeta = None,number_of_harmonics = 5,Hann_order = 1,optimization = 'fortran'):
     """
     Computes the spectrum of a tracking data set for all canonical pairs provided
     """
@@ -152,7 +150,8 @@ def get_harmonics(x = None,px = None,y = None,py = None,zeta = None,pzeta = None
 
             # Computing spectral lines
             df = NAFF(z,pz, number_of_harmonics = number_of_harmonics,
-                                Hann_order      = Hann_order )
+                                Hann_order      = Hann_order,
+                                optimization    = optimization)
             
             results[plane] = df
 
@@ -162,6 +161,53 @@ def get_harmonics(x = None,px = None,y = None,py = None,zeta = None,pzeta = None
 
     return results
 
+
+def find_linear_combinations(frequencies,fundamental_tunes = [],max_jklm = 10):
+    """
+    Categorisation of resonances. Returns the linear combinations of the fundamental tunes that are closest to the provided frequencies.
+    This should be called after get_harmonics to have a list of frequencies.
+    """
+
+    assert len(fundamental_tunes) == 3, "Need 3 fundamental tunes"
+
+    # Create a 3D array of all possible combinations of j, k, l
+    j,k,l,m = np.mgrid[-max_jklm:max_jklm+1, -max_jklm:max_jklm+1,-max_jklm:max_jklm+1,-max_jklm:max_jklm+1]
+
+    # Q_eff = j*Q_x + k*Q_y + l*Q_z + m
+    all_combinations = j * fundamental_tunes[0] + k * fundamental_tunes[1] + l * fundamental_tunes[2] + m
+    
+    # Find the closest combination for each frequency
+    jklm = []
+    err = []
+    for freq in frequencies:
+
+        # Find the index of the closest combination
+        closest_idx = np.unravel_index(np.argmin(np.abs(freq - all_combinations)), all_combinations.shape)
+
+        # Get the corresponding values for l, j, k
+        closest_combination = (j[closest_idx], k[closest_idx], l[closest_idx],m[closest_idx])
+        closest_value = all_combinations[closest_idx]
+
+        jklm.append(closest_combination)
+        err.append(np.abs(closest_value-freq))
+
+    return pd.DataFrame({'jklm':jklm,'err':err,'freq':frequencies})
+
+
+def f90newton_method(z,tune_est,resolution):
+
+
+    # Prepare fortran arguments
+    maxn    = len(z)
+    tunea1  = tune_est
+    deltat  = resolution
+    maxiter = len(z)
+    
+    # Run fortran code
+    f90newton.zfunr(z,maxn,tunea1,deltat,maxiter)
+    tune      = f90newton.zfunr_out.tune_out[0]
+    amplitude = f90newton.zfunr_out.zw_out[0]
+    return tune,amplitude/maxn
 
 
 def newton_method(z,N,tune_est,resolution):
@@ -256,6 +302,9 @@ def calcr(tune_phasor, z):
 def tunenewt(x,px,hanning_order = 1):
     """COMPUTES THE TUNE USING A DISCRETE VERSION OF LASKAR METHOD.
         IT INCLUDES A NEWTON METHOD FOR THE SEARCH OF THE FREQUENCY."""
+    
+    import PySUSSIX.crosssussix.crossroutines as crossroutines
+    import PySUSSIX.crosssussix.crosssussix as crosssussix
 
     # Estimation of Tune with FFT
     maxn = len(x)
