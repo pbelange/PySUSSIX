@@ -12,13 +12,16 @@ import PySUSSIX.ducksussix.f90newton as f90newton
 
 #===========================================
 # Verbatim implementation of the SUSSIX algorithm
-# Note: direct fortran translation found at the bottom of this file
+# Note: direct fortran translation found at the bottom of this file (will be deleted in the future)
 #===========================================
 
 def Hann(N,Nt = None,p=1):
-    """Hann's window, centered at the middle of the dataset.
+    """
+    Hann's window, centered at the middle of the dataset.
+    ----------------------------------------------------
         N : index of the turn
         Nt: total number of turns
+    ----------------------------------------------------
     """
     if Nt is None:
         Nt = np.max(N)
@@ -76,6 +79,13 @@ def FFT_tune_estimate(z):
 
 
 def fundamental_frequency(x,px,Hann_order = 1,optimization = 'fortran'):
+    """
+    Subroutine of the NAFF algorithm. 
+    1. Applies a Hann window
+    2. Estimates the fundamental frequency with an FFT 
+    3. Refines the estimate with a complex Newton method
+    4. Returns the main frequency and the amplitude.
+    """
 
     # Windowing of the signal
     N   = np.arange(len(x))
