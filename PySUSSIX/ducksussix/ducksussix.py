@@ -5,7 +5,10 @@
 import numpy as np
 import pandas as pd
 import math
+import numba
 
+import sys
+sys.path.append('/Users/pbelanger/ABPLocal/PySUSSIX')
 import PySUSSIX.ducksussix.f90newton as f90newton
 
 
@@ -14,6 +17,7 @@ import PySUSSIX.ducksussix.f90newton as f90newton
 # Verbatim implementation of the SUSSIX algorithm
 # Note: direct fortran translation found at the bottom of this file (will be deleted in the future)
 #===========================================
+profile = lambda x: x
 
 def Hann(N,Nt = None,p=1):
     """
@@ -32,6 +36,18 @@ def Hann(N,Nt = None,p=1):
     return (2**p)*math.factorial(p)**2/(math.factorial(2*p)) * (1+np.cos(2*np.pi*(N-center)/Nt))**(p)
 
 
+
+@numba.jit(nopython=True)
+def raise2power(my_exp,N):
+    out    = np.zeros(len(N)) + 1j*np.zeros(len(N))
+    out[0] = 1
+    out[1] = my_exp
+    for i in range(1,len(out)):
+        out[i] = out[i-1]*out[1]
+    return out
+
+
+@profile
 def Laskar_DFFT(freq,N,z):
     """
     Discrete fourier transform of z, as defined in A. Wolski, Sec. 11.5.
@@ -44,8 +60,16 @@ def Laskar_DFFT(freq,N,z):
     ----------------------------------------------------
     """
     Nt = len(z)
-    return sum(1/Nt*np.exp(-2*np.pi*1j*freq*N)*z)
+    deriv_factor = 1j*N
 
+    # to_sum = 1/Nt*np.exp(-2*np.pi*1j*freq*N)*z
+    to_sum = 1/Nt*raise2power(np.exp(-2*np.pi*1j*freq),N)*z
+
+    _DFFT            = np.sum(to_sum)
+    _DFFT_derivative = np.sum(deriv_factor*to_sum)
+    return _DFFT,_DFFT_derivative
+
+@profile
 def Laskar_DFFT_derivative(freq,N,z):
     """
     Derivative of laskar_DFFT w.r.t freq
@@ -53,31 +77,34 @@ def Laskar_DFFT_derivative(freq,N,z):
     """
     Nt = len(z)
     deriv_factor = 1j*N
-    return sum(1/Nt*deriv_factor*1*np.exp(-2*np.pi*1j*freq*N)*z)
+    return np.sum(1/Nt*deriv_factor*1*np.exp(-2*np.pi*1j*freq*N)*z)
 
 
-def FFT_tune_estimate(z):
+
+
+def FFT_tune_estimate(z,n_forced = None):
     """
     Estimate the tune using an FFT. The signal is cropped to the closest power of 2 for improved accuracy.
     ----------------------------------------------------
-        z   : complex array of the signal
+        z        : complex array of the signal
+        n_forced : number of turns to use for the FFT. if > len(z), the signal is padded with zeros
     ----------------------------------------------------
     """
     # Cropping signal to closest power of 2
-    Nt      = len(z)
-    crop_at = 2**int(np.log2(Nt))
+    if n_forced is None:
+        n_forced = 2**int(np.log2(len(z)))
 
     # Search for maximum in Fourier spectrum
-    z_spectrum = np.fft.fft(z[:crop_at])
-    idx_max  = np.argmax(np.abs(z_spectrum))
+    z_spectrum = np.fft.fft(z,n=n_forced)
+    idx_max    = np.argmax(np.abs(z_spectrum))
     
     # Estimation of Tune with FFT
-    tune_est   = idx_max/crop_at
-    resolution = 1/crop_at
+    tune_est   = idx_max/n_forced
+    resolution = 1/n_forced
 
     return tune_est,resolution
 
-
+@profile
 def fundamental_frequency(x,px,Hann_order = 1,optimization = 'fortran'):
     """
     Subroutine of the NAFF algorithm. 
@@ -89,7 +116,7 @@ def fundamental_frequency(x,px,Hann_order = 1,optimization = 'fortran'):
 
     # Windowing of the signal
     N   = np.arange(len(x))
-    z   = np.array(x) + 1j*np.array(px)
+    z   = np.array(x) - 1j*np.array(px)
     z_w = z * Hann(N, Nt=len(z),p=Hann_order)
     
     # Estimation of the tune with FFT
@@ -108,7 +135,7 @@ def fundamental_frequency(x,px,Hann_order = 1,optimization = 'fortran'):
 
     return tune,amplitude
 
-
+@profile
 def NAFF(x,px,number_of_harmonics = 5,Hann_order = 1,optimization = 'fortran'):
     """
     Applies the NAFF algorithm to find the spectral lines of a signal.
@@ -120,7 +147,7 @@ def NAFF(x,px,number_of_harmonics = 5,Hann_order = 1,optimization = 'fortran'):
     x,px = np.array(x),np.array(px)
 
     # initialisation
-    z  = x + 1j*px
+    z  = x - 1j*px
     N  = np.arange(len(x))
     
     
@@ -138,13 +165,13 @@ def NAFF(x,px,number_of_harmonics = 5,Hann_order = 1,optimization = 'fortran'):
         # Substraction procedure
         zgs  = amp * np.exp(2 * np.pi * 1j * freq * N)
         z   -= zgs
-        x,px = np.real(z), np.imag(z)
+        x,px = np.real(z), -np.imag(z)
 
     
     return pd.DataFrame({'amplitude':amplitudes,'frequency':frequencies})
 
 
-
+@profile
 def get_harmonics(x = None,px = None,y = None,py = None,zeta = None,pzeta = None,number_of_harmonics = 5,Hann_order = 1,optimization = 'fortran'):
     """
     Computes the spectrum of a tracking data set for all canonical pairs provided
@@ -219,7 +246,7 @@ def f90newton_method(z,tune_est,resolution):
     amplitude = f90newton.zfunr_out.zw_out[0]
     return tune,amplitude/maxn
 
-
+@profile
 def newton_method(z,N,tune_est,resolution):
     # Increase resolution by factor 5
     resolution /= 5
@@ -228,9 +255,9 @@ def newton_method(z,N,tune_est,resolution):
     tune_val  = np.zeros(10)
 
 
-    DFFT   = Laskar_DFFT(tune_est,N,z)
-    DFFT_d = Laskar_DFFT_derivative(tune_est,N,z)
-    dtunea1 = DFFT.real*DFFT_d.real + DFFT.imag*DFFT_d.imag
+    # DFFT,DFFT_d = Laskar_DFFT(tune_est,N,z)
+    # # DFFT_d = Laskar_DFFT_derivative(tune_est,N,z)
+    # dtunea1 = DFFT.real*DFFT_d.real + DFFT.imag*DFFT_d.imag
 
 
     # old name
@@ -240,8 +267,8 @@ def newton_method(z,N,tune_est,resolution):
     num    = 0
     
 
-    DFFT   = Laskar_DFFT(tunea1,N,z)
-    DFFT_d = Laskar_DFFT_derivative(tunea1,N,z)
+    DFFT,DFFT_d = Laskar_DFFT(tunea1,N,z)
+    # DFFT_d = Laskar_DFFT_derivative(tunea1,N,z)
 
     
     dtunea1 = DFFT.real*DFFT_d.real + DFFT.imag*DFFT_d.imag
@@ -254,8 +281,8 @@ def newton_method(z,N,tune_est,resolution):
     for ntest in range(1, 11):
         tunea2 = tunea1+deltat
 
-        DFFT   = Laskar_DFFT(tunea2,N,z)
-        DFFT_d = Laskar_DFFT_derivative(tunea2,N,z)
+        DFFT ,DFFT_d  = Laskar_DFFT(tunea2,N,z)
+        # DFFT_d = Laskar_DFFT_derivative(tunea2,N,z)
         dtunea2 = DFFT.real*DFFT_d.real + DFFT.imag*DFFT_d.imag
 
         
@@ -269,8 +296,8 @@ def newton_method(z,N,tune_est,resolution):
                 tune3 = (tune1 + ratio * tune2) / (1.0 + ratio)
 
                 
-                DFFT   = Laskar_DFFT(tune3,N,z)
-                DFFT_d = Laskar_DFFT_derivative(tune3,N,z)
+                DFFT,DFFT_d = Laskar_DFFT(tune3,N,z)
+                # DFFT_d = Laskar_DFFT_derivative(tune3,N,z)
                 dtune3 = DFFT.real*DFFT_d.real + DFFT.imag*DFFT_d.imag
 
 
@@ -297,7 +324,7 @@ def newton_method(z,N,tune_est,resolution):
 
     idx_max = np.argmax(tune_val[:num])
     tune      = tune_test[idx_max]
-    amplitude = Laskar_DFFT(tune,N,z)
+    amplitude,_ = Laskar_DFFT(tune,N,z)
     return tune,amplitude
 
 

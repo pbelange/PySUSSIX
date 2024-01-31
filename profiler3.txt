@@ -1,0 +1,280 @@
+               amplitude  frequency
+0   10.000034+ 0.000000j   0.310258
+1    0.588237- 0.000016j   0.310425
+2    0.588240+ 0.000029j   0.310091
+3    0.153848- 0.000014j   0.310591
+4    0.153848+ 0.000015j   0.309925
+5    0.068967- 0.000008j   0.310758
+6    0.068967+ 0.000008j   0.309758
+7    0.038911- 0.000005j   0.310925
+8    0.038911+ 0.000005j   0.309591
+9    0.024938- 0.000000j   0.308258
+10   0.024938+ 0.000000j   0.312258
+11   0.024938- 0.000000j   0.311091
+12   0.024938+ 0.000000j   0.309425
+13   0.001467- 0.000000j   0.312425
+14   0.001467+ 0.000000j   0.308091
+15   0.001467- 0.000000j   0.308425
+16   0.001467+ 0.000000j   0.312091
+17   0.000384- 0.000000j   0.312591
+18   0.000384+ 0.000000j   0.307925
+19   0.000384- 0.000000j   0.308591
+20   0.000384+ 0.000000j   0.311925
+21   0.000172- 0.000000j   0.312758
+22   0.000172+ 0.000000j   0.307758
+23   0.000172- 0.000000j   0.308758
+24   0.000172+ 0.000000j   0.311758
+25   0.000097- 0.000000j   0.312925
+26   0.000097+ 0.000000j   0.307591
+27   0.000097- 0.000000j   0.308925
+28   0.000097+ 0.000000j   0.311591
+29   0.000062+ 0.000000j   0.313091
+30   0.000062- 0.000000j   0.307425
+31   0.000062+ 0.000000j   0.309091
+elapsed time: 1.1357 s
+Wrote profile results to profile_test.py.lprof
+Timer unit: 1e-06 s
+
+Total time: 0.979709 s
+File: /Users/pbelanger/ABPLocal/PySUSSIX/PySUSSIX/ducksussix/ducksussix.py
+Function: Laskar_DFFT at line 50
+
+Line #      Hits         Time  Per Hit   % Time  Line Contents
+==============================================================
+    50                                           @profile
+    51                                           def Laskar_DFFT(freq,N,z):
+    52                                               """
+    53                                               Discrete fourier transform of z, as defined in A. Wolski, Sec. 11.5.
+    54                                               In a typical DFFT , freq = m/Nt where m is an integer. Here m could take any value.
+    55                                               Note: this will differ from sussix.f.calcr by a factor 1/Nt (but does not slow the convergence of the Newton method, so not a problem)
+    56                                               ----------------------------------------------------
+    57                                                   freq: discrete frequency to evaluate the DFFT at
+    58                                                   N   : turn numbers of the signal
+    59                                                   z   : complex array of the signal
+    60                                               ----------------------------------------------------
+    61                                               """
+    62       509        138.0      0.3      0.0      Nt = len(z)
+    63       509      79958.0    157.1      8.2      deriv_factor = 1j*N
+    64                                           
+    65                                               # to_sum = 1/Nt*np.exp(-2*np.pi*1j*freq*N)*z
+    66       509     814249.0   1599.7     83.1      to_sum = 1/Nt*raise2power(np.exp(-2*np.pi*1j*freq),N)*z
+    67                                           
+    68       509      21609.0     42.5      2.2      _DFFT            = np.sum(to_sum)
+    69       509      63662.0    125.1      6.5      _DFFT_derivative = np.sum(deriv_factor*to_sum)
+    70       509         93.0      0.2      0.0      return _DFFT,_DFFT_derivative
+
+Total time: 0 s
+File: /Users/pbelanger/ABPLocal/PySUSSIX/PySUSSIX/ducksussix/ducksussix.py
+Function: Laskar_DFFT_derivative at line 72
+
+Line #      Hits         Time  Per Hit   % Time  Line Contents
+==============================================================
+    72                                           @profile
+    73                                           def Laskar_DFFT_derivative(freq,N,z):
+    74                                               """
+    75                                               Derivative of laskar_DFFT w.r.t freq
+    76                                               Note: differs from exact derivative by a factor -2pi (but allows newton method to converge)
+    77                                               """
+    78                                               Nt = len(z)
+    79                                               deriv_factor = 1j*N
+    80                                               return np.sum(1/Nt*deriv_factor*1*np.exp(-2*np.pi*1j*freq*N)*z)
+
+Total time: 1.07676 s
+File: /Users/pbelanger/ABPLocal/PySUSSIX/PySUSSIX/ducksussix/ducksussix.py
+Function: fundamental_frequency at line 107
+
+Line #      Hits         Time  Per Hit   % Time  Line Contents
+==============================================================
+   107                                           @profile
+   108                                           def fundamental_frequency(x,px,Hann_order = 1,optimization = 'fortran'):
+   109                                               """
+   110                                               Subroutine of the NAFF algorithm. 
+   111                                               1. Applies a Hann window
+   112                                               2. Estimates the fundamental frequency with an FFT 
+   113                                               3. Refines the estimate with a complex Newton method
+   114                                               4. Returns the main frequency and the amplitude.
+   115                                               """
+   116                                           
+   117                                               # Windowing of the signal
+   118        32        889.0     27.8      0.1      N   = np.arange(len(x))
+   119        32      15331.0    479.1      1.4      z   = np.array(x) - 1j*np.array(px)
+   120        32      22655.0    708.0      2.1      z_w = z * Hann(N, Nt=len(z),p=Hann_order)
+   121                                               
+   122                                               # Estimation of the tune with FFT
+   123        32      31750.0    992.2      2.9      tune_est,resolution = FFT_tune_estimate(z_w)
+   124                                           
+   125                                               # Preparing the estimate for the Newton refinement method
+   126        32         11.0      0.3      0.0      if tune_est >= 0.5:
+   127                                                   tune_est = -(1.0 - tune_est)
+   128        32         14.0      0.4      0.0      tune_est = tune_est - resolution
+   129                                           
+   130                                               # Refinement of the tune calulation
+   131        32          6.0      0.2      0.0      if optimization == 'fortran':
+   132                                                   tune,amplitude = f90newton_method(z_w,tune_est,resolution)
+   133                                               else:
+   134        32    1006094.0  31440.4     93.4          tune,amplitude = newton_method(z_w,N,tune_est,resolution)
+   135                                           
+   136        32          5.0      0.2      0.0      return tune,amplitude
+
+Total time: 1.13549 s
+File: /Users/pbelanger/ABPLocal/PySUSSIX/PySUSSIX/ducksussix/ducksussix.py
+Function: NAFF at line 138
+
+Line #      Hits         Time  Per Hit   % Time  Line Contents
+==============================================================
+   138                                           @profile
+   139                                           def NAFF(x,px,number_of_harmonics = 5,Hann_order = 1,optimization = 'fortran'):
+   140                                               """
+   141                                               Applies the NAFF algorithm to find the spectral lines of a signal.
+   142                                               """
+   143                                           
+   144         1          1.0      1.0      0.0      assert number_of_harmonics >=1, 'number_of_harmonics needs to be > 1'
+   145                                               
+   146                                               # Converting to numpy arrays
+   147         1        139.0    139.0      0.0      x,px = np.array(x),np.array(px)
+   148                                           
+   149                                               # initialisation
+   150         1        337.0    337.0      0.0      z  = x - 1j*px
+   151         1         63.0     63.0      0.0      N  = np.arange(len(x))
+   152                                               
+   153                                               
+   154         1          0.0      0.0      0.0      frequencies = []
+   155         1          0.0      0.0      0.0      amplitudes  = [] 
+   156        33         15.0      0.5      0.0      for _ in range(number_of_harmonics):
+   157                                           
+   158                                                   # Computing frequency and amplitude
+   159        32    1080035.0  33751.1     95.1          freq,amp  = fundamental_frequency(x,px,Hann_order=Hann_order,optimization=optimization)
+   160                                           
+   161                                                   # Saving results
+   162        32         23.0      0.7      0.0          frequencies.append(freq)
+   163        32         10.0      0.3      0.0          amplitudes.append(amp)
+   164                                           
+   165                                                   # Substraction procedure
+   166        32      48865.0   1527.0      4.3          zgs  = amp * np.exp(2 * np.pi * 1j * freq * N)
+   167        32       2000.0     62.5      0.2          z   -= zgs
+   168        32       1964.0     61.4      0.2          x,px = np.real(z), -np.imag(z)
+   169                                           
+   170                                               
+   171         1       2041.0   2041.0      0.2      return pd.DataFrame({'amplitude':amplitudes,'frequency':frequencies})
+
+Total time: 1.13569 s
+File: /Users/pbelanger/ABPLocal/PySUSSIX/PySUSSIX/ducksussix/ducksussix.py
+Function: get_harmonics at line 174
+
+Line #      Hits         Time  Per Hit   % Time  Line Contents
+==============================================================
+   174                                           @profile
+   175                                           def get_harmonics(x = None,px = None,y = None,py = None,zeta = None,pzeta = None,number_of_harmonics = 5,Hann_order = 1,optimization = 'fortran'):
+   176                                               """
+   177                                               Computes the spectrum of a tracking data set for all canonical pairs provided
+   178                                               """
+   179                                           
+   180         1          1.0      1.0      0.0      results = {}
+   181         4          0.0      0.0      0.0      for pair in [(x,px,'x'),(y,py,'y'),(zeta,pzeta,'zeta')]:
+   182         3          2.0      0.7      0.0          z,pz,plane = pair
+   183                                                   
+   184         3          0.0      0.0      0.0          if z is not None:
+   185         1          0.0      0.0      0.0              if pz is None:
+   186                                                           pz = np.zeros(len(z))
+   187                                           
+   188                                                       # Computing spectral lines
+   189         2    1135683.0 567841.5    100.0              df = NAFF(z,pz, number_of_harmonics = number_of_harmonics,
+   190         1          0.0      0.0      0.0                                  Hann_order      = Hann_order,
+   191         1          0.0      0.0      0.0                                  optimization    = optimization)
+   192                                                       
+   193         1          0.0      0.0      0.0              results[plane] = df
+   194                                           
+   195                                                   else:
+   196         2          0.0      0.0      0.0              results[plane] = None
+   197                                           
+   198                                           
+   199         1          1.0      1.0      0.0      return results
+
+Total time: 1.00531 s
+File: /Users/pbelanger/ABPLocal/PySUSSIX/PySUSSIX/ducksussix/ducksussix.py
+Function: newton_method at line 249
+
+Line #      Hits         Time  Per Hit   % Time  Line Contents
+==============================================================
+   249                                           @profile
+   250                                           
+   251                                           def newton_method(z,N,tune_est,resolution):
+   252                                               # Increase resolution by factor 5
+   253        32         12.0      0.4      0.0      resolution /= 5
+   254                                           
+   255        32         30.0      0.9      0.0      tune_test = np.zeros(10)
+   256        32          3.0      0.1      0.0      tune_val  = np.zeros(10)
+   257                                           
+   258                                           
+   259                                               # DFFT,DFFT_d = Laskar_DFFT(tune_est,N,z)
+   260                                               # # DFFT_d = Laskar_DFFT_derivative(tune_est,N,z)
+   261                                               # dtunea1 = DFFT.real*DFFT_d.real + DFFT.imag*DFFT_d.imag
+   262                                           
+   263                                           
+   264                                               # old name
+   265        32          5.0      0.2      0.0      tunea1 = tune_est
+   266        32          5.0      0.2      0.0      deltat = resolution
+   267        32          3.0      0.1      0.0      err    = 1e-10
+   268        32          0.0      0.0      0.0      num    = 0
+   269                                               
+   270                                           
+   271        32     507351.0  15854.7     50.5      DFFT,DFFT_d = Laskar_DFFT(tunea1,N,z)
+   272                                               # DFFT_d = Laskar_DFFT_derivative(tunea1,N,z)
+   273                                           
+   274                                               
+   275        32         37.0      1.2      0.0      dtunea1 = DFFT.real*DFFT_d.real + DFFT.imag*DFFT_d.imag
+   276                                           
+   277                                           
+   278                                           
+   279        32          9.0      0.3      0.0      tunea2 = 0
+   280        32          3.0      0.1      0.0      dtunea2 = 0
+   281                                               
+   282       352         71.0      0.2      0.0      for ntest in range(1, 11):
+   283       320         59.0      0.2      0.0          tunea2 = tunea1+deltat
+   284                                           
+   285       320     334163.0   1044.3     33.2          DFFT ,DFFT_d  = Laskar_DFFT(tunea2,N,z)
+   286                                                   # DFFT_d = Laskar_DFFT_derivative(tunea2,N,z)
+   287       320        280.0      0.9      0.0          dtunea2 = DFFT.real*DFFT_d.real + DFFT.imag*DFFT_d.imag
+   288                                           
+   289                                                   
+   290       320        108.0      0.3      0.0          if (dtunea1 <= 0) and (dtunea2 >= 0):
+   291        32          7.0      0.2      0.0              tune1, tune2, dtune1, dtune2 = tunea1, tunea2, dtunea1, dtunea2
+   292                                           
+   293                                                       
+   294       125         44.0      0.4      0.0              for ncont in range(1, 101):
+   295       125         63.0      0.5      0.0                  ratio = -dtune1 / dtune2 if abs(dtune2) > 0 else 0.0
+   296                                           
+   297       125         37.0      0.3      0.0                  tune3 = (tune1 + ratio * tune2) / (1.0 + ratio)
+   298                                           
+   299                                                           
+   300       125     128971.0   1031.8     12.8                  DFFT,DFFT_d = Laskar_DFFT(tune3,N,z)
+   301                                                           # DFFT_d = Laskar_DFFT_derivative(tune3,N,z)
+   302       125        102.0      0.8      0.0                  dtune3 = DFFT.real*DFFT_d.real + DFFT.imag*DFFT_d.imag
+   303                                           
+   304                                           
+   305       125         31.0      0.2      0.0                  if dtune3 <= 0.0:
+   306        65         12.0      0.2      0.0                      if tune1 == tune3:
+   307         5          1.0      0.2      0.0                          break
+   308        60         11.0      0.2      0.0                      tune1, dtune1 = tune3, dtune3
+   309                                                           else:
+   310        60          8.0      0.1      0.0                      if tune2 == tune3:
+   311         3          0.0      0.0      0.0                          break
+   312        57         10.0      0.2      0.0                      tune2, dtune2 = tune3, dtune3
+   313                                           
+   314       117         44.0      0.4      0.0                  if abs(tune2 - tune1) <= err:
+   315        24          4.0      0.2      0.0                      break
+   316                                           
+   317                                                       
+   318        32         32.0      1.0      0.0              tune_test[num] = tune3
+   319        32         69.0      2.2      0.0              tune_val[num]  = np.abs(DFFT)
+   320        32         12.0      0.4      0.0              num += 1
+   321                                                       
+   322                                           
+   323                                           
+   324       320         74.0      0.2      0.0          tunea1, dtunea1 = tunea2, dtunea2
+   325                                           
+   326        32        201.0      6.3      0.0      idx_max = np.argmax(tune_val[:num])
+   327        32         17.0      0.5      0.0      tune      = tune_test[idx_max]
+   328        32      33419.0   1044.3      3.3      amplitude,_ = Laskar_DFFT(tune,N,z)
+   329        32          3.0      0.1      0.0      return tune,amplitude
+
